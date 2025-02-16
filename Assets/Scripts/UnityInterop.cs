@@ -9,6 +9,8 @@ public class UnityInterop : MonoBehaviour
     private const string NativeUI = "NativeUI";
     private const string NativeSwift = "NativeSwift";
 
+    private static Queue<string> _pluginMessages = new Queue<string>();
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void LogCallback(string message);
 
@@ -16,7 +18,7 @@ public class UnityInterop : MonoBehaviour
     public static void ReceiveMessage(string message)
     {
         Debug.Log("Message from DLL: " + message);
-        GameLifetimeEvent.OnMessageReceive?.Invoke(message);
+        _pluginMessages.Enqueue(message);
     }
 
     [DllImport("kernel32.dll")]
@@ -34,7 +36,14 @@ public class UnityInterop : MonoBehaviour
         _handlers.Add(LoadLibrary(NativeSwift + ".dll"));
 
         SetUnityCallback(ReceiveMessage);
-        //ShowNativePage();
+    }
+
+    private void Update()
+    {
+        while (_pluginMessages.Count > 0)
+        {
+            DispatchMessage(_pluginMessages.Dequeue());
+        }
     }
 
     private void OnApplicationQuit()
@@ -48,6 +57,11 @@ public class UnityInterop : MonoBehaviour
         }
     }
 
+    private void DispatchMessage(string message)
+    {
+        GameLifetimeEvent.OnMessageReceive?.Invoke(message);
+    }
+
     [DllImport(CppWrapper)]
     public static extern void SetUnityCallback(LogCallback callback);
 
@@ -55,7 +69,7 @@ public class UnityInterop : MonoBehaviour
     public static extern void ShowNativePage();
 
     [DllImport(NativeSwift)]
-    public static extern void ObjectRotated();
+    public static extern void ObjectRotated(float x, float y, float z);
 
     [DllImport(NativeSwift)]
     public static extern void SetupEmitter();
